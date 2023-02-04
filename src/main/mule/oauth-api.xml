@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:oauth2-provider="http://www.mulesoft.org/schema/mule/oauth2-provider"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/oauth2-provider http://www.mulesoft.org/schema/mule/oauth2-provider/current/mule-oauth2-provider.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<os:object-store name="clientObjectstore" doc:name="Object store" doc:id="9b841638-3541-41a1-a0a2-02fd920f4d66" />
+	<os:object-store name="tokenObjectStore" doc:name="Object store" doc:id="29d22559-98ed-4689-8e9a-fc15167c9b4b" persistent="false"/>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="c0150064-7604-441a-b146-f9b963536345" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<oauth2-provider:config name="OAuth2_Provider_Config" doc:name="OAuth2 Provider Config" doc:id="6edfb830-6abe-4024-acdd-cd72a2d1e987" listenerConfig="HTTP_Listener_config" clientStore="clientObjectstore" supportedGrantTypes="CLIENT_CREDENTIALS" >
+		<oauth2-provider:token-config tokenStore="tokenObjectStore" tokenTtl="20">
+		</oauth2-provider:token-config>
+	</oauth2-provider:config>
+	<http:request-config name="HTTP_Request_configuration-client1" doc:name="HTTP Request configuration" doc:id="5bf64ae7-c88f-4389-95b1-2484179481ed" >
+		<http:request-connection host="0.0.0.0" port="8081" connectionIdleTimeout="3000000"/>
+	</http:request-config>
+	<flow name="oauth-apiFlow" doc:id="40ec61f3-3b2b-4376-90ee-99a543c2fb9d" >
+		<http:listener doc:name="Listener" doc:id="1a690539-6e72-43e4-9cec-57b41397c51e" config-ref="HTTP_Listener_config" path="/createclient"/>
+		<logger level="INFO" doc:name="Logger" doc:id="9f782920-6b16-480e-b517-d3fdef2c7e9c" message="Clientcreation flow has started&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;"/>
+		<oauth2-provider:create-client doc:name="Create client" doc:id="d8029670-8e28-4e6e-8603-9534a628642c" config-ref="OAuth2_Provider_Config" clientId="#[attributes.headers.client_id]" type="CONFIDENTIAL" secret="#[attributes.headers.client_secret]" clientName='#[attributes.headers.client_name]' authorizedGrantTypes='#[["CLIENT_CREDENTIALS"]]'/>
+		<set-payload value='#["Client Got Created"]' doc:name="Set Payload" doc:id="e1deb12f-166c-4644-a231-43ee802747f5" />
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="a9fc26cb-1503-4aea-bef9-a59484c7a946" type="ANY">
+				<ee:transform doc:name="Transform Message" doc:id="807aa758-b32c-4e44-a26b-ceb9f9da1d9e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"errorMessage": error.description
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="Statuscode" ><![CDATA[400]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="oauth-apiFlow1" doc:id="7fca0711-3fdc-4a3a-aea0-35aa60e9e347" >
+		<http:listener doc:name="Listener" doc:id="4006e690-0e54-4ba7-9840-62f310bde2bf" config-ref="HTTP_Listener_config" path="/validate">
+			<http:error-response statusCode="#[vars.StatusCode]" >
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="118e4d85-9c84-4c3a-8ce3-50ac24688a9b" message="Validation Flow Started&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;"/>
+		<oauth2-provider:validate-token doc:name="Validate token" doc:id="72b8c08a-9506-4870-a279-9f1df189ba9a" config-ref="OAuth2_Provider_Config"/>
+		<set-payload value='"Valid client"' doc:name="Set Payload" doc:id="99d90af2-6162-434a-9efc-9941625398b7" />
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="975fe0ca-4d30-4e62-87d6-95b537b1cddd" type="OAUTH2-PROVIDER:TOKEN_UNAUTHORIZED">
+				<ee:transform doc:name="Transform Message" doc:id="429e2d55-7818-4f50-8a1e-0f8af8e73db2" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"error": error.description
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="Statuscode" ><![CDATA[401]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="0ce60ac1-fb1f-4005-a5be-c158b29f1710" type="EXPRESSION, STREAM_MAXIMUM_SIZE_EXCEEDED">
+				<ee:transform doc:name="Transform Message" doc:id="71a158e2-da5a-4bc5-9ebd-deaa0823a1de" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"error": error.description
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="Statuscode" ><![CDATA[500]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="oauth-apiFlow2" doc:id="1cbaca37-375d-4a6c-a75b-b267dde4149e" initialState="started">
+		<scheduler doc:name="Scheduler" doc:id="c3335196-cb83-4923-a225-d8e4cc46bb6c" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="25" timeUnit="DAYS" startDelay="25"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve-all doc:name="Retrieve all" doc:id="1a47c5b5-fdec-4a3c-88fb-45db3766a4c7" objectStore="clientObjectstore"/>
+		<ee:transform doc:name="Transform Message" doc:id="a7a6255b-8145-4b08-812d-447512c1be5e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="a891c5e8-125e-4704-af62-4d5c506d6158" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload pluck ((value, key, index) -> {
+    "client_name": value..clientName reduce $,
+    "client_secret": value..secret reduce $,
+    "client_id": value..clientId reduce $
+}))]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="970fe6ed-5923-45b6-8aa4-3d0d8e4ab5dd" >
+			<ee:transform doc:name="Transform Message" doc:id="af1085a1-2397-488a-bcd2-3e5d3c637943" >
+				<ee:message >
+					<ee:set-attributes ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"headers": {
+		"client_name": payload.client_name,
+		"client_id": payload.client_id,
+		"client_secret": payload.client_secret
+	}
+}]]></ee:set-attributes>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Flow Reference" doc:id="f7fa46a8-1183-4c12-9d98-4d56aa896e36" name="oauth-apiFlow"/>
+		</foreach>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="81f27bf8-35ed-4dce-a9f4-7d9ee7706c7a" type="ANY">
+				<ee:transform doc:name="Transform Message" doc:id="39b4dcc0-d66d-45b2-9587-58a705af204f" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"error": error.description
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="Statuscode" ><![CDATA[500]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="oauth-apiFlow3" doc:id="4d6be40b-ed11-4dfb-a1fc-05e5aa1567fd" initialState="stopped">
+		<scheduler doc:name="Scheduler" doc:id="2d531e69-ee7a-40a1-96df-9d482a37b948" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="20" timeUnit="SECONDS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="8399ba1f-ba26-43aa-92aa-61c8f886205e" />
+		<scatter-gather doc:name="Scatter-Gather" doc:id="522e58a6-427d-4d9c-b240-6a0c56e97c5b" >
+			<route >
+				<http:request method="POST" doc:name="creating the client1" doc:id="c80f6f5d-1397-4ce0-97e9-ad76fdb3ed53" config-ref="HTTP_Request_configuration-client1" path="/createclient">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"client_name" : "taraktechzone",
+	"client_secret" : "tarak6588545455",
+	"client_id" : "6588545455"
+}]]]></http:headers>
+		</http:request>
+				<logger level="INFO" doc:name="Logger" doc:id="b0ff16f7-28ce-4baf-899b-f615a938221b" message="&gt;&gt;&gt;First  1st Client  got Created" />
+			</route>
+			<route >
+				<http:request method="POST" doc:name="creating the client2" doc:id="4bbae7df-6a32-4aa5-8a5e-c392f4934d0b" config-ref="HTTP_Request_configuration-client1" path="/createclient">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"client_name" : "balaji",
+	"client_secret" : "bal3641676164",
+	"client_id" : "2662865245"
+}]]]></http:headers>
+		</http:request>
+				<logger level="INFO" doc:name="Logger" doc:id="df10096f-3714-4601-8ce1-3f70d21eb275" message="&gt;&gt;&gt;Second  2nd Client  got Created" />
+			</route>
+		</scatter-gather>
+	</flow>
+</mule>

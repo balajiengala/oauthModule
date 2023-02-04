@@ -1,0 +1,8 @@
+%dw 2.0
+
+type auto_40ec61f3_3b2b_4376_90ee_99a543c2fb9d_Input_Payload = {|
+  client_name: Null, 
+  client_secret: Null, 
+  client_id: Null
+|}
+
