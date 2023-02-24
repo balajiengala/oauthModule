@@ -176,7 +176,7 @@ output application/json
 	"client_id" : "2662865245"
 }]]]></http:headers>
 		</http:request>
-				<logger level="INFO" doc:name="Logger" doc:id="df10096f-3714-4601-8ce1-3f70d21eb275" message="&gt;&gt;&gt;Second  2nd Client  got Created" />
+				<logger level="INFO" doc:name="Logger" doc:id="df10096f-3714-4601-8ce1-3f70d21eb275" message="&gt;&gt;&gt;Second  2nd Client  got Created and operation is done" />
 			</route>
 		</scatter-gather>
 	</flow>
